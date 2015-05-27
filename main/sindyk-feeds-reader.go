@@ -19,8 +19,8 @@ func main() {
 
 	if len(*dbname) <= 0 {
 		fmt.Println("Database Name. Required");
-	    flag.Usage()
-	    os.Exit(1)
+		flag.Usage()
+		os.Exit(1)
 	}
 
 	// start parsing.

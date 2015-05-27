@@ -1,13 +1,11 @@
-package reader
+package parser
 
 import (
 	"io/ioutil"
 	"encoding/xml"
 	"html/template"
-	// "log"
 	"net/http"
 	"errors"
-	// "fmt"
 	"bytes"
 	"github.com/nebiros/sindyk-feeds-reader/lib/charset"
 )
@@ -34,7 +32,9 @@ type Item struct {
 	PubDate string `xml:"pubDate"`
 	Comments string `xml:"comments"`
 	Guid string `xml:"guid"`
-	Enclosure `xml:"enclosure"`
+	DcSubject string `xml:"http://purl.org/dc/elements/1.1/ subject"`
+	DcCreator template.HTML `xml:"http://purl.org/dc/elements/1.1/ creator"`
+	Enclosure Enclosure `xml:"enclosure"`
 	Category string `xml:"category"`
 	Hour string `xml:"hora"`
 	Order string `xml:"order"`
@@ -44,7 +44,6 @@ type Item struct {
 type Enclosure struct {
 	Url string `xml:"url,attr"`
 	MimeType string `xml:"type,attr"`
-	Value string `xml:",chardata"`
 }
 
 type RssHandlerFunc func (rss Rss, err error)
@@ -98,15 +97,14 @@ func ParseRssContent(c []byte) (feed Rss, err error) {
 		return Rss{}, err
 	}
 
-	if r.Version == "2.0" {
-		// RSS 2.0
-		for i, _ := range r.ItemList {
-			if r.ItemList[i].Content != "" {
-				r.ItemList[i].Description = r.ItemList[i].Content
-			}
-		}
-		return r, nil
+	if r.Version != "2.0" {
+		return Rss{}, errors.New("Not a valid RSS 2.0 feed")
 	}
 
-	return Rss{}, errors.New("Not a valid RSS 2.0 feed")
+	for i, _ := range r.ItemList {
+		if r.ItemList[i].Content != "" {
+			r.ItemList[i].Description = r.ItemList[i].Content
+		}
+	}
+	return r, nil
 }
