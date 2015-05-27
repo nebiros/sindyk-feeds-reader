@@ -16,5 +16,5 @@ func Start(p Params) {
 	// get all feeds from db.
 	feeds := Feeds()
 	// process each feed.
-	ReadFeeds(feeds)
+	PullFeeds(feeds)
 }

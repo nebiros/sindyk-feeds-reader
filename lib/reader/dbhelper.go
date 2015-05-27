@@ -45,7 +45,7 @@ func OpenDb(p Params) {
 func Feeds() (feeds []Feed) {
 	query := `SELECT
 	    feeds.id AS feed_id,
-	    feeds.active AS feed_active,
+		feeds.active AS feed_active,
 		feeds.link AS url
 		FROM feeds
 	    LEFT JOIN
