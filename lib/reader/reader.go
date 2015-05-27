@@ -6,7 +6,7 @@ import (
 	"log"
 	"runtime"
 	"fmt"
-	"github.com/nebiros/sindyk-feeds-reader/lib/parser"
+	"github.com/nebiros/sindyk-feeds-reader/lib/rss"
 )
 
 const (
@@ -19,7 +19,7 @@ var (
 	// db connection.
 	DB *sql.DB
 	// feeds channel.
-	feedsChannel chan parser.Rss
+	feedsChannel chan rss.Rss
 )
 
 type Params struct {
@@ -122,15 +122,15 @@ func Process(feeds []FeedRow) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	for _, f := range feeds {
-		go parser.FetchRss(f.Url, rssHandler)
+		go rss.Fetch(f.Url, rssHandler)
 	}
 
-	feedsChannel = make(chan parser.Rss)
+	feedsChannel = make(chan rss.Rss)
 	for r := range feedsChannel {
 		fmt.Printf("[PullFeeds] r, %T, %#v\n", r, r)
 	}
 }
 
-func rssHandler(rss parser.Rss, err error) {
+func rssHandler(rss rss.Rss, err error) {
 	feedsChannel <- rss
 }

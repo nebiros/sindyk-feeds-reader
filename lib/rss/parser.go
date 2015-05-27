@@ -1,4 +1,4 @@
-package parser
+package rss
 
 import (
 	"io/ioutil"
@@ -48,9 +48,9 @@ type Enclosure struct {
 
 type RssHandlerFunc func (rss Rss, err error)
 
-func FetchRss(uri string, rh RssHandlerFunc) {
+func Fetch(uri string, rh RssHandlerFunc) {
 	_ = "breakpoint"
-	b, err := LoadRssUri(uri)
+	b, err := LoadUri(uri)
 	if err != nil {
 		if rh != nil {
 			rh(Rss{}, err)
@@ -58,7 +58,7 @@ func FetchRss(uri string, rh RssHandlerFunc) {
 		return
 	}
 
-	f, err := ParseRssContent(b)
+	f, err := Parse(b)
 	if err != nil {
 		if rh != nil {
 			rh(Rss{}, err)
@@ -71,7 +71,7 @@ func FetchRss(uri string, rh RssHandlerFunc) {
 	}
 }
 
-func LoadRssUri(uri string) (content []byte, err error) {
+func LoadUri(uri string) (content []byte, err error) {
 	client := http.DefaultClient
 	resp, err := client.Get(uri)
 	if err != nil {
@@ -87,7 +87,7 @@ func LoadRssUri(uri string) (content []byte, err error) {
 	return []byte(data), nil
 }
 
-func ParseRssContent(c []byte) (feed Rss, err error) {
+func Parse(c []byte) (feed Rss, err error) {
 	r := Rss{}
 
 	decoder := xml.NewDecoder(bytes.NewReader(c))
