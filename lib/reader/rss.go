@@ -4,15 +4,15 @@ import (
 	"io/ioutil"
 	"encoding/xml"
 	"html/template"
-	"log"
+	// "log"
 	"net/http"
 	"errors"
-	"fmt"
+	// "fmt"
 	"bytes"
 	"github.com/nebiros/sindyk-feeds-reader/lib/charset"
 )
 
-type Rss2 struct {
+type Rss struct {
 	XMLName xml.Name `xml:"rss"`
 	Version string `xml:"version,attr"`
 	// Required
@@ -21,10 +21,10 @@ type Rss2 struct {
 	Description string `xml:"channel>description"`
 	// Optional
 	PubDate string `xml:"channel>pubDate"`
-	ItemList []Rss2Item `xml:"channel>item"`
+	ItemList []Item `xml:"channel>item"`
 }
 
-type Rss2Item struct {
+type Item struct {
 	// Required
 	Title string `xml:"title"`
 	Link string `xml:"link"`
@@ -34,30 +34,45 @@ type Rss2Item struct {
 	PubDate string `xml:"pubDate"`
 	Comments string `xml:"comments"`
 	Guid string `xml:"guid"`
+	Enclosure `xml:"enclosure"`
 	Category string `xml:"category"`
 	Hour string `xml:"hora"`
 	Order string `xml:"order"`
 	Id string `xml:"id"`
 }
 
-func FetchRss2(uri string) (feed Rss2, err error) {
-	_ = "breakpoint"
-	b, err := LoadRss2Uri(uri)
-	if err != nil {
-		log.Println(err)
-		return Rss2{}, err
-	}
-
-	f, err := ParseRss2Content(b)
-	if err != nil {
-		log.Println(err)
-		return Rss2{}, err
-	}
-	fmt.Printf("f, %T, %#v\n", f, f)
-	return f, nil
+type Enclosure struct {
+	Url string `xml:"url,attr"`
+	MimeType string `xml:"type,attr"`
+	Value string `xml:",chardata"`
 }
 
-func LoadRss2Uri(uri string) (content []byte, err error) {
+type RssHandlerFunc func (rss Rss, err error)
+
+func FetchRss(uri string, rh RssHandlerFunc) {
+	_ = "breakpoint"
+	b, err := LoadRssUri(uri)
+	if err != nil {
+		if rh != nil {
+			rh(Rss{}, err)
+		}
+		return
+	}
+
+	f, err := ParseRssContent(b)
+	if err != nil {
+		if rh != nil {
+			rh(Rss{}, err)
+		}
+		return
+	}
+
+	if rh != nil {
+		rh(f, nil)
+	}
+}
+
+func LoadRssUri(uri string) (content []byte, err error) {
 	client := http.DefaultClient
 	resp, err := client.Get(uri)
 	if err != nil {
@@ -73,14 +88,14 @@ func LoadRss2Uri(uri string) (content []byte, err error) {
 	return []byte(data), nil
 }
 
-func ParseRss2Content(c []byte) (feed Rss2, err error) {
-	r := Rss2{}
+func ParseRssContent(c []byte) (feed Rss, err error) {
+	r := Rss{}
 
 	decoder := xml.NewDecoder(bytes.NewReader(c))
 	decoder.CharsetReader = charset.CharsetReader
 	err = decoder.Decode(&r)
 	if err != nil {
-		return Rss2{}, err
+		return Rss{}, err
 	}
 
 	if r.Version == "2.0" {
@@ -93,5 +108,5 @@ func ParseRss2Content(c []byte) (feed Rss2, err error) {
 		return r, nil
 	}
 
-	return Rss2{}, errors.New("Not a valid RSS 2.0 feed")
+	return Rss{}, errors.New("Not a valid RSS 2.0 feed")
 }
