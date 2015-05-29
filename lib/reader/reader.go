@@ -186,9 +186,9 @@ func Process(af []*FeedRow) {
 				link := strings.TrimSpace(i.Link)
 
 				u, err := url.Parse(link)
-			    if err != nil {
-			        log.Println("[Process] " + err.Error())
-			    }
+				if err != nil {
+					log.Println("[Process] " + err.Error())
+				}
 
 				slug := u.Path
 				if string([]rune(slug)[0]) == "/" {
