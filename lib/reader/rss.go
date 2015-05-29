@@ -56,16 +56,16 @@ func FetchRss(uri string, fr *FeedRow, rh RssHandlerFunc) {
 	if err != nil {
 		if rh != nil {
 			rh(nil, nil, err)
+			return
 		}
-		return
 	}
 
 	f, err := ParseRss(b)
 	if err != nil {
 		if rh != nil {
 			rh(nil, nil, err)
+			return
 		}
-		return
 	}
 
 	if rh != nil {

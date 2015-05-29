@@ -44,7 +44,7 @@ type ItemRow struct {
 	Content string
 	Creator string
 	ImageUrl string
-	Active bool
+	Active int
 	DisplayOrder int
 	Subject string
 	Category string
@@ -60,6 +60,8 @@ type feedChannelPack struct {
 }
 
 func Start(p Params) {
+	log.Println("[Start]")
+
 	OpenDb(p)
 
 	// get all feeds from conn.
@@ -68,6 +70,8 @@ func Start(p Params) {
 	Process(activeFeeds)
 
 	defer conn.Close()
+
+	log.Println("[Done]")
 }
 
 func OpenDb(p Params) {
@@ -75,14 +79,12 @@ func OpenDb(p Params) {
 
 	conn, err = sql.Open(DbDefaultDriver, buildDbDsn(p))
 	if err != nil {
-		log.Fatal("[OpenDb] " + err.Error())
-		conn.Close()
+		log.Fatalf("[Error] [OpenDb] %s", err)
 	}
 
 	err = conn.Ping()
 	if err != nil {
-		log.Fatal("[OpenDb] " + err.Error())
-		conn.Close()
+		log.Fatalf("[Error] [OpenDb] %s", err)
 	}
 }
 
@@ -116,7 +118,7 @@ func ActiveFeedsFromDb() (activeFeeds []*FeedRow) {
 
 	rows, err := conn.Query(query, 1, 0, 1, 1)
 	if err != nil {
-		log.Fatal("[ActiveFeedsFromDb] " + err.Error())
+		log.Fatalf("[Error] [ActiveFeedsFromDb] %s", err)
 	}
 	defer rows.Close()
 
@@ -125,14 +127,14 @@ func ActiveFeedsFromDb() (activeFeeds []*FeedRow) {
 
 		err := rows.Scan(&f.Id, &f.Active, &f.Url)
 		if err != nil {
-			log.Fatal("[ActiveFeedsFromDb] " + err.Error())
+			log.Fatalf("[Error] [ActiveFeedsFromDb] %s", err)
 		}
 
 		activeFeeds = append(activeFeeds, f)
 	}
 	err = rows.Err()
 	if err != nil {
-		log.Fatal("[ActiveFeedsFromDb] " + err.Error())
+		log.Fatalf("[Error] [ActiveFeedsFromDb] %s", err)
 	}
 
 	return activeFeeds
@@ -144,18 +146,20 @@ func Process(af []*FeedRow) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	for _, f := range af {
+		log.Printf("[Process] %s\n", f.Url)
+
+		go DisableFeedItemsFromDb(f.Id)
 		go FetchRss(f.Url, f, rssHandler)
 	}
 
-	feedsChannel = make(chan feedChannelPack)
+	feedsChannel = make(chan feedChannelPack, len(af))
+	defer close(feedsChannel)
+
 	for cp := range feedsChannel {
-		// fmt.Printf("[PullFeeds] r, %T, %#v\n\n", cp, cp)
 		if cp.err != nil {
-			log.Println("[Process] " + cp.err.Error())
+			log.Printf("[Error] [Process] %s\n", cp.err)
 		} else {
 			for _, i := range cp.rss.RssItemList {
-				// item := cp.rss.RssItemList[l]
-				fmt.Printf("[RssItemList] item, %T, %#v\n\n", i, i)
 				content := i.Content
 				if len(content) <= 0 {
 					content = i.Description
@@ -186,6 +190,13 @@ func Process(af []*FeedRow) {
 			        log.Println("[Process] " + err.Error())
 			    }
 
+				slug := u.Path
+				if string([]rune(slug)[0]) == "/" {
+					slug = slug[1:len(slug)]
+				}
+
+				log.Printf("[Item] [Start] %s\n", link)
+
 				ir := ItemRow{FeedId: cp.feedRow.Id,
 					ExternalId: i.Id,
 					Title: strings.TrimSpace(i.Title),
@@ -195,31 +206,29 @@ func Process(af []*FeedRow) {
 					Content: html.EscapeString(content),
 					Creator: html.EscapeString(creator),
 					ImageUrl: imageUrl,
-					Active: true,
+					Active: 1,
 					DisplayOrder: i.Order,
 					Category: strings.TrimSpace(i.Category),
 					Subject: subject,
 					Hour: strings.TrimSpace(i.Hour),
 					Related: strings.TrimSpace(i.Related),
-					Slug: u.Path}
-				// SaveItemToDb(&ir)
+					Slug: slug}
+				SaveItemToDb(&ir)
 			}
 		}
 	}
 }
 
 func rssHandler(r *Rss, fr *FeedRow, err error) {
-	// DisableFeedItemsFromDb(fr.Id)
-	fmt.Printf("[rssHandler] fr, %T, %#v\n\n", fr, fr)
-	feedsChannel <- feedChannelPack{rss: r, feedRow: fr, err: err}
+	feedsChannel <-feedChannelPack{rss: r, feedRow: fr, err: err}
 }
 
-func SaveItemToDb(ir *ItemRow) {
+func SaveItemToDb(ir *ItemRow) (id int64) {
 	var (
 		itemIdSelectQuery string
-		itemId *int
+		itemId int64
 	)
-	_ = "breakpoint"
+
 	if ir.ExternalId > 0 {
 		itemIdSelectQuery = `SELECT
             items.id
@@ -233,7 +242,7 @@ func SaveItemToDb(ir *ItemRow) {
 		err := conn.QueryRow(itemIdSelectQuery, ir.ExternalId, ir.FeedId).Scan(&itemId)
 		if err != nil {
 			if err != sql.ErrNoRows {
-				log.Fatal("[SaveItemToDb] " + err.Error())
+				log.Fatalf("[Error] [SaveItemToDb] %s", err)
 			}
 		}
 	} else {
@@ -246,22 +255,21 @@ func SaveItemToDb(ir *ItemRow) {
 		    AND
 		    items.feed_id = ?`
 
-		err := conn.QueryRow(itemIdSelectQuery, fmt.Sprintf("%%s%", ir.Title), ir.FeedId).Scan(itemId)
+		err := conn.QueryRow(itemIdSelectQuery, fmt.Sprintf("%%s%", ir.Title), ir.FeedId).Scan(&itemId)
 		if err != nil {
 			if err != sql.ErrNoRows {
-				log.Fatal("[SaveItemToDb] " + err.Error())
+				log.Fatalf("[Error] [SaveItemToDb] %s", err)
 			}
 		}
 	}
-	fmt.Printf("[SaveItemToDb] itemId, %T, %#v\n\n", itemId, itemId)
 
 	tx, err := conn.Begin()
 	if err != nil {
-		log.Fatal("[SaveItemToDb] " + err.Error())
+		log.Fatalf("[Error] [SaveItemToDb] %s", err)
 	}
 	defer tx.Rollback()
 
-	if itemId != nil {
+	if itemId > 0 {
 		updateQuery := `UPDATE items SET external_id = ?,
 			feed_id = ?,
 			title = ?,
@@ -276,13 +284,14 @@ func SaveItemToDb(ir *ItemRow) {
 			image = ?,
 			hour = ?,
 			relacionadas = ?,
-			active = ?
+			active = ?,
+			slug = ?
 			WHERE
 			id = ?`
 
 		stmt, err := tx.Prepare(updateQuery)
 		if err != nil {
-			log.Fatal("[SaveItemToDb] " + err.Error())
+			log.Fatalf("[Error] [SaveItemToDb] %s", err)
 		}
 		defer stmt.Close()
 
@@ -301,10 +310,13 @@ func SaveItemToDb(ir *ItemRow) {
 			ir.Hour,
 			ir.Related,
 			ir.Active,
+			ir.Slug,
 			itemId)
 		if err != nil {
-			log.Fatal("[SaveItemToDb] " + err.Error())
+			log.Fatalf("[Error] [SaveItemToDb] %s", err)
 		}
+
+		log.Printf("[Item] [Updates] %v\n", itemId)
 	} else {
 		insertQuery := `INSERT INTO items (external_id,
 			feed_id,
@@ -320,17 +332,18 @@ func SaveItemToDb(ir *ItemRow) {
 			image,
 			hour,
 			relacionadas,
-			active)
+			active,
+			slug)
 			VALUES
-			(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+			(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 		stmt, err := tx.Prepare(insertQuery)
 		if err != nil {
-			log.Fatal("[SaveItemToDb] " + err.Error())
+			log.Fatalf("[Error] [SaveItemToDb] %s", err)
 		}
 		defer stmt.Close()
 
-		_, err = stmt.Exec(ir.ExternalId,
+		res, err := stmt.Exec(ir.ExternalId,
 			ir.FeedId,
 			ir.Title,
 			ir.Link,
@@ -344,22 +357,34 @@ func SaveItemToDb(ir *ItemRow) {
 			ir.ImageUrl,
 			ir.Hour,
 			ir.Related,
-			ir.Active)
+			ir.Active,
+			ir.Slug)
 		if err != nil {
-			log.Fatal("[SaveItemToDb] " + err.Error())
+			log.Fatalf("[Error] [SaveItemToDb] %s", err)
 		}
+
+		itemId, err = res.LastInsertId()
+		if err != nil {
+			log.Fatalf("[Error] [SaveItemToDb] %s", err)
+		}
+
+		log.Printf("[Item] [Inserts] %v\n", itemId)
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		log.Fatal("[SaveItemToDb] " + err.Error())
+		log.Fatalf("[Error] [SaveItemToDb] %s", err)
 	}
+
+	return itemId
 }
 
-func DisableFeedItemsFromDb(id int) {
+func DisableFeedItemsFromDb(id int) (rowsAffected int64) {
+	log.Printf("[DisableFeedItemsFromDb] %v\n", id)
+
 	tx, err := conn.Begin()
 	if err != nil {
-		log.Fatal("[DisableFeedItemsFromDb] " + err.Error())
+		log.Fatalf("[Error] [DisableFeedItemsFromDb] %s", err)
 	}
 	defer tx.Rollback()
 
@@ -369,17 +394,24 @@ func DisableFeedItemsFromDb(id int) {
 
 	stmt, err := tx.Prepare(updateQuery)
 	if err != nil {
-		log.Fatal("[DisableItemsFromDb] " + err.Error())
+		log.Fatalf("[Error] [DisableItemsFromDb] %s", err)
 	}
 	defer stmt.Close()
 
-	_, err = stmt.Exec(id)
+	res, err := stmt.Exec(id)
 	if err != nil {
-		log.Fatal("[DisableItemsFromDb] " + err.Error())
+		log.Fatalf("[Error] [DisableItemsFromDb] %s", err)
+	}
+
+	rowCnt, err := res.RowsAffected()
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		log.Fatal("[DisableItemsFromDb] " + err.Error())
+		log.Fatalf("[Error] [DisableItemsFromDb] %s", err)
 	}
+
+	return rowCnt
 }

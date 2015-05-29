@@ -4,10 +4,14 @@ import (
 	"flag"
 	"fmt"
 	"os"
+
 	"github.com/nebiros/sindyk-feeds-reader/lib/reader"
+	// "github.com/pkg/profile"
 )
 
 func main() {
+	// defer profile.Start().Stop()
+
 	// set cli flags.
 	dbaddress := flag.String("dbaddress", "127.0.0.1", "Database Address. Defaults to \"127.0.0.1\"");
 	dbusername := flag.String("dbusername", "root", "Database Username. Defaults to \"root\"");
@@ -31,4 +35,6 @@ func main() {
 		Port: *dbport,
 		Charset: *dbcharset}
 	reader.Start(params)
+
+	os.Exit(0)
 }
