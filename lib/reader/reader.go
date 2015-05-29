@@ -231,13 +231,13 @@ func SaveItemToDb(ir *ItemRow) (id int64) {
 
 	if ir.ExternalId > 0 {
 		itemIdSelectQuery = `SELECT
-            items.id
-            FROM
-            items
-            WHERE
-            items.external_id = ?
-            AND
-            items.feed_id = ?`
+			items.id
+			FROM
+			items
+			WHERE
+			items.external_id = ?
+			AND
+			items.feed_id = ?`
 
 		err := conn.QueryRow(itemIdSelectQuery, ir.ExternalId, ir.FeedId).Scan(&itemId)
 		if err != nil {
@@ -247,13 +247,13 @@ func SaveItemToDb(ir *ItemRow) (id int64) {
 		}
 	} else {
 		itemIdSelectQuery = `SELECT
-		    items.id
-		    FROM
-		    items
-		    WHERE
-		    items.title LIKE ?
-		    AND
-		    items.feed_id = ?`
+			items.id
+			FROM
+			items
+			WHERE
+			items.title LIKE ?
+			AND
+			items.feed_id = ?`
 
 		err := conn.QueryRow(itemIdSelectQuery, fmt.Sprintf("%%s%", ir.Title), ir.FeedId).Scan(&itemId)
 		if err != nil {
