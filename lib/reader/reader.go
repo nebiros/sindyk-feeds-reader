@@ -211,7 +211,7 @@ func Process(af []*FeedRow) {
 
 				log.Printf("[Item] [Start] %s\n", link)
 
-				ir := ItemRow{FeedId: ff.FeedId,
+				ir := &ItemRow{FeedId: ff.FeedId,
 					ExternalId: i.Id,
 					Title: strings.TrimSpace(i.Title),
 					Description: html.EscapeString(i.Description),
@@ -227,7 +227,7 @@ func Process(af []*FeedRow) {
 					Hour: strings.TrimSpace(i.Hour),
 					Related: strings.TrimSpace(i.Related),
 					Slug: slug}
-				SaveItemToDb(&ir)
+				SaveItemToDb(ir)
 			}
 		}
 	}()
