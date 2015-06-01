@@ -9,6 +9,7 @@ import (
 	"strings"
 	"html"
 	"net/url"
+	"sync"
 )
 
 const (
@@ -20,8 +21,6 @@ const (
 var (
 	// db connection.
 	conn *sql.DB
-	// feeds channel.
-	feedsChannel chan feedChannelPack
 )
 
 type Params struct {
@@ -53,10 +52,13 @@ type ItemRow struct {
 	Slug string
 }
 
-type feedChannelPack struct {
-	rss *Rss
-	feedRow *FeedRow
-	err error
+type FetchedFeed struct {
+	FeedId int
+	Rss *Rss
+}
+
+func init() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
 }
 
 func Start(p Params) {
@@ -143,23 +145,35 @@ func ActiveFeedsFromDb() (activeFeeds []*FeedRow) {
 func Process(af []*FeedRow) {
 	_ = "breakpoint"
 
-	runtime.GOMAXPROCS(runtime.NumCPU())
+	fetchedFeeds := make(chan *FetchedFeed)
+
+	var wg sync.WaitGroup
+	wg.Add(len(af))
 
 	for _, f := range af {
-		log.Printf("[Process] %s\n", f.Url)
+		go func (f *FeedRow) {
+			defer wg.Done()
 
-		go DisableFeedItemsFromDb(f.Id)
-		go FetchRss(f.Url, f, rssHandler)
+			log.Printf("[Process] %s\n", f.Url)
+
+			DisableFeedItemsFromDb(f.Id)
+
+			r, err := FetchRss(f.Url)
+			if err != nil {
+				log.Printf("[Error] [Process] %s\n", err)
+			} else {
+				fetchedFeeds <- &FetchedFeed{FeedId: f.Id, Rss: r}
+			}
+		}(f)
 	}
 
-	feedsChannel = make(chan feedChannelPack, len(af))
-	defer close(feedsChannel)
+	go func () {
+		for ff := range fetchedFeeds {
+			if ff.Rss == nil {
+				continue
+			}
 
-	for cp := range feedsChannel {
-		if cp.err != nil {
-			log.Printf("[Error] [Process] %s\n", cp.err)
-		} else {
-			for _, i := range cp.rss.RssItemList {
+			for _, i := range ff.Rss.RssItemList {
 				content := i.Content
 				if len(content) <= 0 {
 					content = i.Description
@@ -187,7 +201,7 @@ func Process(af []*FeedRow) {
 
 				u, err := url.Parse(link)
 				if err != nil {
-					log.Println("[Process] " + err.Error())
+					log.Printf("[Error] [Process] %s\n", err)
 				}
 
 				slug := u.Path
@@ -197,7 +211,7 @@ func Process(af []*FeedRow) {
 
 				log.Printf("[Item] [Start] %s\n", link)
 
-				ir := ItemRow{FeedId: cp.feedRow.Id,
+				ir := ItemRow{FeedId: ff.FeedId,
 					ExternalId: i.Id,
 					Title: strings.TrimSpace(i.Title),
 					Description: html.EscapeString(i.Description),
@@ -216,11 +230,9 @@ func Process(af []*FeedRow) {
 				SaveItemToDb(&ir)
 			}
 		}
-	}
-}
+	}()
 
-func rssHandler(r *Rss, fr *FeedRow, err error) {
-	feedsChannel <-feedChannelPack{rss: r, feedRow: fr, err: err}
+	wg.Wait()
 }
 
 func SaveItemToDb(ir *ItemRow) (id int64) {
@@ -255,7 +267,7 @@ func SaveItemToDb(ir *ItemRow) (id int64) {
 			AND
 			items.feed_id = ?`
 
-		err := conn.QueryRow(itemIdSelectQuery, fmt.Sprintf("%%s%", ir.Title), ir.FeedId).Scan(&itemId)
+		err := conn.QueryRow(itemIdSelectQuery, fmt.Sprintf("%%%s%%", ir.Title), ir.FeedId).Scan(&itemId)
 		if err != nil {
 			if err != sql.ErrNoRows {
 				log.Fatalf("[Error] [SaveItemToDb] %s", err)

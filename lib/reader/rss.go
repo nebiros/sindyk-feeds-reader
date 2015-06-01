@@ -49,28 +49,18 @@ type RssItemEnclosure struct {
 	MimeType string `xml:"type,attr"`
 }
 
-type RssHandlerFunc func (rss *Rss, fr *FeedRow, err error)
-
-func FetchRss(uri string, fr *FeedRow, rh RssHandlerFunc) {
+func FetchRss(uri string) (rss *Rss, err error) {
 	b, err := LoadRssUri(uri)
 	if err != nil {
-		if rh != nil {
-			rh(nil, nil, err)
-			return
-		}
+		return nil, err
 	}
 
 	f, err := ParseRss(b)
 	if err != nil {
-		if rh != nil {
-			rh(nil, nil, err)
-			return
-		}
+		return nil, err
 	}
 
-	if rh != nil {
-		rh(f, fr, nil)
-	}
+	return f, nil
 }
 
 func LoadRssUri(uri string) (content []byte, err error) {
