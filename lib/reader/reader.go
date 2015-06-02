@@ -145,7 +145,7 @@ func ActiveFeedsFromDb() (activeFeeds []*FeedRow) {
 func Process(af []*FeedRow) {
 	_ = "breakpoint"
 
-	fetchedFeeds := make(chan *FetchedFeed)
+	fetchedFeeds := make(chan *FetchedFeed, len(af))
 
 	var wg sync.WaitGroup
 	wg.Add(len(af))
@@ -173,66 +173,70 @@ func Process(af []*FeedRow) {
 				continue
 			}
 
-			for _, i := range ff.Rss.RssItemList {
-				content := i.Content
-				if len(content) <= 0 {
-					content = i.Description
-				}
-
-				subject := strings.TrimSpace(i.Subject)
-				if len(subject) <= 0 {
-					subject = strings.TrimSpace(i.DcSubject)
-				}
-
-				creator := i.Creator
-				if len(creator) <= 0 {
-					creator = i.DcCreator
-				}
-
-				var imageUrl string
-				if i.RssItemEnclosure != nil {
-					mime := strings.Split(i.RssItemEnclosure.MimeType, "/")
-					if mime[0] == "image" {
-						imageUrl = i.RssItemEnclosure.Url
-					}
-				}
-
-				link := strings.TrimSpace(i.Link)
-
-				u, err := url.Parse(link)
-				if err != nil {
-					log.Printf("[Error] [Process] %s\n", err)
-				}
-
-				slug := u.Path
-				if string([]rune(slug)[0]) == "/" {
-					slug = slug[1:len(slug)]
-				}
-
-				log.Printf("[Item] [Start] %s\n", link)
-
-				ir := &ItemRow{FeedId: ff.FeedId,
-					ExternalId: i.Id,
-					Title: strings.TrimSpace(i.Title),
-					Description: html.EscapeString(i.Description),
-					Link: link,
-					PubDate: strings.TrimSpace(i.PubDate),
-					Content: html.EscapeString(content),
-					Creator: html.EscapeString(creator),
-					ImageUrl: imageUrl,
-					Active: 1,
-					DisplayOrder: i.Order,
-					Category: strings.TrimSpace(i.Category),
-					Subject: subject,
-					Hour: strings.TrimSpace(i.Hour),
-					Related: strings.TrimSpace(i.Related),
-					Slug: slug}
-				SaveItemToDb(ir)
-			}
+			Marshal(ff.FeedId, ff.Rss.RssItemList)
 		}
 	}()
 
 	wg.Wait()
+}
+
+func Marshal(id int, il []*RssItem) {
+	for _, i := range il {
+		content := i.Content
+		if len(content) <= 0 {
+			content = i.Description
+		}
+
+		subject := strings.TrimSpace(i.Subject)
+		if len(subject) <= 0 {
+			subject = strings.TrimSpace(i.DcSubject)
+		}
+
+		creator := i.Creator
+		if len(creator) <= 0 {
+			creator = i.DcCreator
+		}
+
+		var imageUrl string
+		if i.RssItemEnclosure != nil {
+			mime := strings.Split(i.RssItemEnclosure.MimeType, "/")
+			if mime[0] == "image" {
+				imageUrl = i.RssItemEnclosure.Url
+			}
+		}
+
+		link := strings.TrimSpace(i.Link)
+
+		u, err := url.Parse(link)
+		if err != nil {
+			log.Printf("[Error] [Process] %s\n", err)
+		}
+
+		slug := u.Path
+		if string([]rune(slug)[0]) == "/" {
+			slug = slug[1:len(slug)]
+		}
+
+		log.Printf("[Item] [Start] %s\n", link)
+
+		ir := &ItemRow{FeedId: id,
+			ExternalId: i.Id,
+			Title: strings.TrimSpace(i.Title),
+			Description: html.EscapeString(i.Description),
+			Link: link,
+			PubDate: strings.TrimSpace(i.PubDate),
+			Content: html.EscapeString(content),
+			Creator: html.EscapeString(creator),
+			ImageUrl: imageUrl,
+			Active: 1,
+			DisplayOrder: i.Order,
+			Category: strings.TrimSpace(i.Category),
+			Subject: subject,
+			Hour: strings.TrimSpace(i.Hour),
+			Related: strings.TrimSpace(i.Related),
+			Slug: slug}
+		SaveItemToDb(ir)
+	}
 }
 
 func SaveItemToDb(ir *ItemRow) (id int64) {
