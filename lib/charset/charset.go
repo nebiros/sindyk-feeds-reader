@@ -3,15 +3,15 @@ package charset
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"strings"
-	"errors"
 	"syscall"
 	"unicode/utf8"
 )
 
 type CharsetISO88591er struct {
-	r	io.ByteReader
+	r   io.ByteReader
 	buf *bytes.Buffer
 }
 

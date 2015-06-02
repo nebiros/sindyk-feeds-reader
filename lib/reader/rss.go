@@ -1,51 +1,51 @@
 package reader
 
 import (
-	"io/ioutil"
-	"encoding/xml"
-	"net/http"
-	"errors"
 	"bytes"
+	"encoding/xml"
+	"errors"
+	"io/ioutil"
+	"net/http"
 
 	"github.com/nebiros/sindyk-feeds-reader/lib/charset"
 )
 
 type Rss struct {
 	XMLName xml.Name `xml:"rss"`
-	Version string `xml:"version,attr"`
+	Version string   `xml:"version,attr"`
 	// Required
-	Title string `xml:"channel>title"`
-	Link string `xml:"channel>link"`
+	Title       string `xml:"channel>title"`
+	Link        string `xml:"channel>link"`
 	Description string `xml:"channel>description"`
 	// Optional
-	PubDate string `xml:"channel>pubDate"`
+	PubDate     string     `xml:"channel>pubDate"`
 	RssItemList []*RssItem `xml:"channel>item"`
 }
 
 type RssItem struct {
 	// Required
-	Title string `xml:"title"`
-	Link string `xml:"link"`
+	Title       string `xml:"title"`
+	Link        string `xml:"link"`
 	Description string `xml:"description"`
 	// Optional
-	Content string `xml:"encoded,omitempty"`
-	PubDate string `xml:"pubDate,omitempty"`
-	Comments string `xml:"comments,omitempty"`
-	Guid string `xml:"guid,omitempty"`
-	DcSubject string `xml:"http://purl.org/dc/elements/1.1/ dc:subject,omitempty"`
-	DcCreator string `xml:"http://purl.org/dc/elements/1.1/ dc:creator,omitempty"`
+	Content          string            `xml:"encoded,omitempty"`
+	PubDate          string            `xml:"pubDate,omitempty"`
+	Comments         string            `xml:"comments,omitempty"`
+	Guid             string            `xml:"guid,omitempty"`
+	DcSubject        string            `xml:"http://purl.org/dc/elements/1.1/ dc:subject,omitempty"`
+	DcCreator        string            `xml:"http://purl.org/dc/elements/1.1/ dc:creator,omitempty"`
 	RssItemEnclosure *RssItemEnclosure `xml:"enclosure,omitempty"`
-	Category string `xml:"category,omitempty"`
-	Hour string `xml:"hora,omitempty"`
-	Order int `xml:"order,omitempty"`
-	Id int `xml:"id,omitempty"`
-	Related string `xml:"relacionadas,omitempty"`
-	Subject string `xml:"subject,omitempty"`
-	Creator string `xml:"creator,omitempty"`
+	Category         string            `xml:"category,omitempty"`
+	Hour             string            `xml:"hora,omitempty"`
+	Order            int               `xml:"order,omitempty"`
+	Id               int               `xml:"id,omitempty"`
+	Related          string            `xml:"relacionadas,omitempty"`
+	Subject          string            `xml:"subject,omitempty"`
+	Creator          string            `xml:"creator,omitempty"`
 }
 
 type RssItemEnclosure struct {
-	Url string `xml:"url,attr"`
+	Url      string `xml:"url,attr"`
 	MimeType string `xml:"type,attr"`
 }
 

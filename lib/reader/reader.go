@@ -2,20 +2,20 @@ package reader
 
 import (
 	"database/sql"
-	_ "github.com/go-sql-driver/mysql"
-	"log"
-	"runtime"
 	"fmt"
-	"strings"
+	_ "github.com/go-sql-driver/mysql"
 	"html"
+	"log"
 	"net/url"
+	"runtime"
+	"strings"
 	"sync"
 )
 
 const (
 	// "user:password@tcp(localhost:3306)/dbname??charset=utf8"
 	DbDefaultDsnFormat = "%s:%s@tcp(%s:%s)/%s?charset=%s"
-	DbDefaultDriver = "mysql"
+	DbDefaultDriver    = "mysql"
 )
 
 var (
@@ -28,33 +28,33 @@ type Params struct {
 }
 
 type FeedRow struct {
-	Id int
-	Url string
+	Id     int
+	Url    string
 	Active bool
 }
 
 type ItemRow struct {
-	FeedId int
-	ExternalId int
-	Title string
-	Description string
-	Link string
-	PubDate string
-	Content string
-	Creator string
-	ImageUrl string
-	Active int
+	FeedId       int
+	ExternalId   int
+	Title        string
+	Description  string
+	Link         string
+	PubDate      string
+	Content      string
+	Creator      string
+	ImageUrl     string
+	Active       int
 	DisplayOrder int
-	Subject string
-	Category string
-	Hour string
-	Related string
-	Slug string
+	Subject      string
+	Category     string
+	Hour         string
+	Related      string
+	Slug         string
 }
 
 type FetchedFeed struct {
 	FeedId int
-	Rss *Rss
+	Rss    *Rss
 }
 
 func init() {
@@ -97,7 +97,7 @@ func buildDbDsn(p Params) string {
 		p.Address,
 		p.Port,
 		p.Database,
-		p.Charset);
+		p.Charset)
 
 	return dsn
 }
@@ -151,7 +151,7 @@ func Process(af []*FeedRow) {
 	wg.Add(len(af))
 
 	for _, f := range af {
-		go func (f *FeedRow) {
+		go func(f *FeedRow) {
 			defer wg.Done()
 
 			log.Printf("[Process] %s\n", f.Url)
@@ -167,7 +167,7 @@ func Process(af []*FeedRow) {
 		}(f)
 	}
 
-	go func () {
+	go func() {
 		for ff := range fetchedFeeds {
 			if ff.Rss == nil {
 				continue
@@ -220,21 +220,21 @@ func Marshal(id int, il []*RssItem) {
 		log.Printf("[Item] [Start] %s\n", link)
 
 		ir := &ItemRow{FeedId: id,
-			ExternalId: i.Id,
-			Title: strings.TrimSpace(i.Title),
-			Description: html.EscapeString(i.Description),
-			Link: link,
-			PubDate: strings.TrimSpace(i.PubDate),
-			Content: html.EscapeString(content),
-			Creator: html.EscapeString(creator),
-			ImageUrl: imageUrl,
-			Active: 1,
+			ExternalId:   i.Id,
+			Title:        strings.TrimSpace(i.Title),
+			Description:  html.EscapeString(i.Description),
+			Link:         link,
+			PubDate:      strings.TrimSpace(i.PubDate),
+			Content:      html.EscapeString(content),
+			Creator:      html.EscapeString(creator),
+			ImageUrl:     imageUrl,
+			Active:       1,
 			DisplayOrder: i.Order,
-			Category: strings.TrimSpace(i.Category),
-			Subject: subject,
-			Hour: strings.TrimSpace(i.Hour),
-			Related: strings.TrimSpace(i.Related),
-			Slug: slug}
+			Category:     strings.TrimSpace(i.Category),
+			Subject:      subject,
+			Hour:         strings.TrimSpace(i.Hour),
+			Related:      strings.TrimSpace(i.Related),
+			Slug:         slug}
 		SaveItemToDb(ir)
 	}
 }
@@ -242,7 +242,7 @@ func Marshal(id int, il []*RssItem) {
 func SaveItemToDb(ir *ItemRow) (id int64) {
 	var (
 		itemIdSelectQuery string
-		itemId int64
+		itemId            int64
 	)
 
 	if ir.ExternalId > 0 {
