@@ -143,8 +143,6 @@ func ActiveFeedsFromDb() (activeFeeds []*FeedRow) {
 }
 
 func Process(af []*FeedRow) {
-	_ = "breakpoint"
-
 	fetchedFeeds := make(chan *FetchedFeed, len(af))
 
 	var wg sync.WaitGroup
