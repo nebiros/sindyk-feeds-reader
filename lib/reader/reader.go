@@ -59,6 +59,7 @@ type FetchedFeed struct {
 
 func init() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 }
 
 func Start(p Params) {
