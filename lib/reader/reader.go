@@ -30,12 +30,13 @@ type Params struct {
 type FeedRow struct {
 	Id     int
 	Url    string
-	Active bool
+	Active int
 }
 
 type ItemRow struct {
-	FeedId       int
+	Id           int
 	ExternalId   int
+	FeedId       int
 	Title        string
 	Description  string
 	Link         string
@@ -218,8 +219,8 @@ func Marshal(id int, il []*RssItem) {
 
 		log.Printf("[Item] [Start] %s\n", link)
 
-		ir := &ItemRow{FeedId: id,
-			ExternalId:   i.Id,
+		ir := &ItemRow{ExternalId: i.Id,
+			FeedId:       id,
 			Title:        strings.TrimSpace(i.Title),
 			Description:  html.EscapeString(i.Description),
 			Link:         link,
@@ -397,6 +398,46 @@ func SaveItemToDb(ir *ItemRow) (id int64) {
 func DisableFeedItemsFromDb(id int) (rowsAffected int64) {
 	log.Printf("[DisableFeedItemsFromDb] %v\n", id)
 
+	var (
+		totalItems   int64
+		disableItems []string
+	)
+
+	totalItemsQuery := `SELECT COUNT(id)
+		FROM items
+		WHERE feed_id = ?`
+	err := conn.QueryRow(totalItemsQuery, id).Scan(&totalItems)
+	if err != nil {
+		if err != sql.ErrNoRows {
+			log.Fatalf("[Error] [DisableFeedItemsFromDb] %s", err)
+		}
+	}
+
+	itemsDisableQuery := `SELECT id FROM items
+		WHERE feed_id = ?
+		ORDER BY created_at DESC
+		LIMIT ? OFFSET 10`
+	rows, err := conn.Query(itemsDisableQuery, id, totalItems)
+	if err != nil {
+		log.Fatalf("[Error] [DisableFeedItemsFromDb] %s", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var itemId string
+
+		err := rows.Scan(&itemId)
+		if err != nil {
+			log.Fatalf("[Error] [DisableFeedItemsFromDb] %s", err)
+		}
+
+		disableItems = append(disableItems, itemId)
+	}
+	err = rows.Err()
+	if err != nil {
+		log.Fatalf("[Error] [DisableFeedItemsFromDb] %s", err)
+	}
+
 	tx, err := conn.Begin()
 	if err != nil {
 		log.Fatalf("[Error] [DisableFeedItemsFromDb] %s", err)
@@ -405,20 +446,19 @@ func DisableFeedItemsFromDb(id int) (rowsAffected int64) {
 
 	updateQuery := `UPDATE items SET active = 0
 		WHERE
-		feed_id = ?`
-
+		id IN (?)`
 	stmt, err := tx.Prepare(updateQuery)
 	if err != nil {
 		log.Fatalf("[Error] [DisableItemsFromDb] %s", err)
 	}
 	defer stmt.Close()
 
-	res, err := stmt.Exec(id)
+	res, err := stmt.Exec(strings.Join(disableItems, ", "))
 	if err != nil {
 		log.Fatalf("[Error] [DisableItemsFromDb] %s", err)
 	}
 
-	rowCnt, err := res.RowsAffected()
+	count, err := res.RowsAffected()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -428,5 +468,5 @@ func DisableFeedItemsFromDb(id int) (rowsAffected int64) {
 		log.Fatalf("[Error] [DisableItemsFromDb] %s", err)
 	}
 
-	return rowCnt
+	return count
 }
