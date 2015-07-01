@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"runtime"
 	"strings"
-	"sync"
 )
 
 const (
@@ -116,9 +115,10 @@ func ActiveFeedsFromDb() (activeFeeds []*FeedRow) {
 		sections.id = feeds.section_id
 		AND sections.active = ?
 		AND sections.external = ?
-		AND sections.other <> ?
+		AND sections.other != ?
 		WHERE
-		feeds.active = ?`
+		feeds.active = ?
+		ORDER BY feeds.id ASC`
 
 	rows, err := conn.Query(query, 1, 0, 1, 1)
 	if err != nil {
@@ -145,39 +145,35 @@ func ActiveFeedsFromDb() (activeFeeds []*FeedRow) {
 }
 
 func Process(af []*FeedRow) {
-	fetchedFeeds := make(chan *FetchedFeed, len(af))
-
-	var wg sync.WaitGroup
-	wg.Add(len(af))
+	fetchedFeedsChan, errorsChan := make(chan *FetchedFeed), make(chan error)
 
 	for _, f := range af {
 		go func(f *FeedRow) {
-			defer wg.Done()
-
 			log.Printf("[Process] %s\n", f.Url)
 
 			DisableFeedItemsFromDb(f.Id)
 
 			r, err := FetchRss(f.Url)
 			if err != nil {
-				log.Printf("[Error] [Process] %s\n", err)
+				errorsChan <- err
 			} else {
-				fetchedFeeds <- &FetchedFeed{FeedId: f.Id, Rss: r}
+				fetchedFeedsChan <- &FetchedFeed{FeedId: f.Id, Rss: r}
 			}
 		}(f)
 	}
 
-	go func() {
-		for ff := range fetchedFeeds {
+	for _, f := range af {
+		select {
+		case ff := <-fetchedFeedsChan:
 			if ff.Rss == nil {
 				continue
 			}
 
 			Marshal(ff.FeedId, ff.Rss.RssItemList)
+		case err := <-errorsChan:
+			log.Printf("[Error] [Process] [%s] %s\n", f.Url, err)
 		}
-	}()
-
-	wg.Wait()
+	}
 }
 
 func Marshal(id int, il []*RssItem) {

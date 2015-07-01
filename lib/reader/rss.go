@@ -28,20 +28,20 @@ type RssItem struct {
 	Link        string `xml:"link"`
 	Description string `xml:"description"`
 	// Optional
-	Content          string            `xml:"encoded,omitempty"`
-	PubDate          string            `xml:"pubDate,omitempty"`
-	Comments         string            `xml:"comments,omitempty"`
-	Guid             string            `xml:"guid,omitempty"`
-	DcSubject        string            `xml:"http://purl.org/dc/elements/1.1/ dc:subject,omitempty"`
-	DcCreator        string            `xml:"http://purl.org/dc/elements/1.1/ dc:creator,omitempty"`
-	RssItemEnclosure *RssItemEnclosure `xml:"enclosure,omitempty"`
-	Category         string            `xml:"category,omitempty"`
-	Hour             string            `xml:"hora,omitempty"`
-	Order            int               `xml:"order,omitempty"`
-	Id               int               `xml:"id,omitempty"`
-	Related          string            `xml:"relacionadas,omitempty"`
-	Subject          string            `xml:"subject,omitempty"`
-	Creator          string            `xml:"creator,omitempty"`
+	Content          string            `xml:"encoded"`
+	PubDate          string            `xml:"pubDate"`
+	Comments         string            `xml:"comments"`
+	Guid             string            `xml:"guid"`
+	DcSubject        string            `xml:"http://purl.org/dc/elements/1.1/ dc:subject"`
+	DcCreator        string            `xml:"http://purl.org/dc/elements/1.1/ dc:creator"`
+	RssItemEnclosure *RssItemEnclosure `xml:"enclosure"`
+	Category         string            `xml:"category"`
+	Hour             string            `xml:"hora"`
+	Order            int               `xml:"order"`
+	Id               int               `xml:"id"`
+	Related          string            `xml:"relacionadas"`
+	Subject          string            `xml:"subject"`
+	Creator          string            `xml:"creator"`
 }
 
 type RssItemEnclosure struct {
